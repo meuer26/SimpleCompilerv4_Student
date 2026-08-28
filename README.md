@@ -4,7 +4,7 @@ A teaching compiler that uses a subset of a C++-like input language. The languag
 
 Version 1 available [here](https://github.com/meuer26/SimpleCompilerv1). Version 3 available [here](https://github.com/meuer26/SimpleCompilerv3_Student). The first three versions were written between 2023-2026 for teaching compiler concepts.
 
-Version 4 was created in 2026 by taking the existing working Version 3 base code and re-organizing it with the help of Claude Opus 4.7 and 4.8 (Anthropic) at Dan O'Malley's direction to support a clean visitor pattern with AST, graph coloring and liveness pedagogy, as well as basic OOP. I dropped the ARM backend in version 4 to focus most effort on optimizations and advanced language constructs.
+Version 4 was created in 2026 by taking the existing working Version 3 base code and re-organizing it with the help of Claude Opus 4.7 and 4.8 (Anthropic) at Dan O'Malley's direction to support a clean visitor pattern with AST, graph coloring and liveness pedagogy, as well as basic OOP. I dropped the ARM backend in version 4 to focus more effort on optimizations and advanced language constructs.
 
 
 
