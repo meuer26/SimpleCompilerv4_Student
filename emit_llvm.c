@@ -229,11 +229,14 @@ static void emitFunctionHeaderAndBody(Visitor *visitor, AstNode *node)
     // TODO(Assignment 3): Functions can now take one integer argument.
     // Detect whether any child node is an AST_ARG_DECL. If so, start SSA
     // numbering at %2 (%0 = incoming arg, %1 = implicit entry block) and
-    // emit `define i32 @<name>(i32 %0) {`. Otherwise start numbering at %1
-    // and emit the no-arg `define i32 @<name>() {`.
+    // emit `define i32 @<name>Final(i32 %0) {`. Otherwise start numbering
+    // at %1 and emit the no-arg `define i32 @<name>Final() {`.
+    // (The `Final` suffix is the fixed entry-point export name, mirroring
+    // the x86 backend's `<name>Final` label; the driver/evaluator link
+    // against it. It is provided convention, not part of this assignment.)
     // REMOVE the placeholder line(s) below when you implement this:
     context->ssaRegisterIndex = 1;
-    fprintf(context->outputFile, "define i32 @%s() {\n", node->name);
+    fprintf(context->outputFile, "define i32 @%sFinal() {\n", node->name);
 
     for (int bodyIndex = 0; bodyIndex < node->body.count; bodyIndex++)
     {

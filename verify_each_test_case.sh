@@ -15,8 +15,14 @@
 #   ./verify_each_test_case.sh --through 2 dowhile      # combined
 #
 # Each test pauses for a keypress so you can inspect the output.
+#
+# For every test the Makefile builds BOTH backends and checks that each
+# produces the correct answer: the x86-64 binary AND the llc-compiled LLVM
+# binary. Any failure — a build error, an llc/LLVM syntax error, or either
+# backend giving the wrong answer — stops this script immediately.
 
 set -e
+trap 'echo; echo " ***** FAILURE - stopping (see output above) ***** "; echo' ERR
 
 THROUGH=""
 FILTER=""

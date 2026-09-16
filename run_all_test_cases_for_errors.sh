@@ -5,6 +5,11 @@
 #
 # Needs sudo apt install parallel
 #
+# Each test builds BOTH backends and checks each for answer-correctness: the
+# x86-64 binary AND the llc-compiled LLVM binary. Any failure (build error,
+# llc/LLVM syntax error, or either backend giving the wrong answer) makes
+# `make` exit non-zero, and `parallel --halt now,fail=1` stops the whole run.
+#
 # Usage:
 #   ./run_all_test_cases_for_errors.sh                          # every test in every category
 #   ./run_all_test_cases_for_errors.sh --through 1              # cumulative through Assignment 1 (arithmetic-vars)
@@ -31,6 +36,7 @@ function run_test {
 
     cp Makefile lex.l parser.y ast.h ast.c visitor.h \
        symboltable.h symboltable.c semantic.h semantic.c \
+       typecheck.h typecheck.c \
        constfold.h constfold.c \
        regalloc.h regalloc.c \
        liveness.h liveness.c \
