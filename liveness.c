@@ -55,16 +55,44 @@ static int findVariable(LivenessResult *result, const char *name)
 // ---------------------------------------------------------------------------
 
 // Walk an expression and mark every named variable it reads.
-// TODO(Assignment 5): For AST_VAR_REF, look up the name via
-// findOrAddVariable and set useSet[statementIndex][thatIndex] = 1.
-// For AST_ADD/SUB/MUL/LOG_NEG/FUNC_CALL/METHOD_CALL, recurse into the
-// operand(s). AST_INT contributes nothing.
 __attribute__((unused)) static void collectExpressionUses(AstNode *expressionNode, LivenessResult *result, int statementIndex)
 {
-    // REMOVE the placeholder line(s) below when you implement this:
-    (void)expressionNode;
-    (void)result;
-    (void)statementIndex;
+
+    if (!expressionNode)
+    {
+        return;
+    }
+    switch (expressionNode->kind)
+    {
+        case AST_VAR_REF:
+        {
+            int variableIndex = findOrAddVariable(result, expressionNode->name);
+            if (variableIndex >= 0)
+            {
+                result->useSet[statementIndex][variableIndex] = 1;
+            }
+            break;
+        }
+        case AST_ADD:
+        case AST_SUB:
+        case AST_MUL:
+            collectExpressionUses(expressionNode->lOperand, result, statementIndex);
+            collectExpressionUses(expressionNode->rOperand, result, statementIndex);
+            break;
+        case AST_LOG_NEG:
+            collectExpressionUses(expressionNode->rOperand, result, statementIndex);
+            break;
+        case AST_FUNC_CALL:
+        case AST_METHOD_CALL:
+            if (expressionNode->hasArgument)
+            {
+                collectExpressionUses(expressionNode->rOperand, result, statementIndex);
+            }
+            break;
+        default:
+            break;
+    }
+
 }
 
 // Fill use[s] and def[s] for one statement.
@@ -92,17 +120,32 @@ static void computeUseAndDef(AstNode *statementNode, LivenessResult *result, int
 // For every AST_WHILE at position s, set whileToDoBegin[s] to the position
 // of the matching AST_DO_BEGIN. Use a tiny integer stack to handle nested
 // loops. For non-AST_WHILE statements leave the entry at -1.
-//
-// TODO(Assignment 5): Walk body->items[0..body->count-1]. On AST_DO_BEGIN
-// push the index; on AST_WHILE pop and record the pair.
 static void buildLoopPairs(AstList *body, int *whileToDoBegin)
 {
+    int stack[LIVE_MAX_STATEMENTS];
+    int stackTop = 0;
     for (int statementIndex = 0; statementIndex < body->count; statementIndex++)
     {
         whileToDoBegin[statementIndex] = -1;
+        AstNode *statementNode = body->items[statementIndex];
+        if (!statementNode)
+        {
+            continue;
+        }
+        if (statementNode->kind == AST_DO_BEGIN)
+        {
+            stack[stackTop] = statementIndex;
+            stackTop++;
+        }
+        else if (statementNode->kind == AST_WHILE)
+        {
+            if (stackTop > 0)
+            {
+                stackTop--;
+                whileToDoBegin[statementIndex] = stack[stackTop];
+            }
+        }
     }
-    // REMOVE the placeholder line(s) below when you implement this:
-    (void)body;
 }
 
 // Fill `outSuccessors` with the successor indices of statement s.
