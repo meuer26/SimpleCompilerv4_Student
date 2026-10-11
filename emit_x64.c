@@ -9,6 +9,7 @@
 // TODO(Assignment 5): #include "liveness.h" so this file can call
 // livenessAnalyze() / livenessIsVarLiveOut() / livenessFree().
 
+
 #define MAX_LIVE_VAR_VIRTUALS 64
 
 typedef struct
@@ -40,6 +41,108 @@ typedef struct
     // virtuals whose variable became dead.
 } X64Context;
 
+
+/*
+// Record that the named variable was just loaded into the most recently
+// allocated virtual register. The pair is consulted at statement boundaries
+// to drop dead variables' virtuals.
+static void recordVariableLoadedIntoLatestVirtual(X64Context *context, const char *variableName)
+{
+    if (!variableName || context->variableToVirtualMapCount >= MAX_LIVE_VAR_VIRTUALS)
+    {
+        return;
+    }
+    int latestVirtualId = regAllocLastVirtualId(&context->registerAllocator);
+    if (latestVirtualId < 0)
+    {
+        return;
+    }
+    int slotIndex = context->variableToVirtualMapCount;
+    context->variableToVirtualMap[slotIndex].variableName = variableName;
+    context->variableToVirtualMap[slotIndex].virtualId    = latestVirtualId;
+    context->variableToVirtualMapCount++;
+}
+
+// Drop every map entry for a named variable. Call this whenever a visitor
+// writes the variable's stack slot directly (increment, assignment): the
+// register that was caching the variable now disagrees with memory, so the
+// next reference must reload instead of reusing the stale register.
+static void invalidateVariableMappingByName(X64Context *context, const char *variableName)
+{
+    if (!variableName)
+    {
+        return;
+    }
+    int writeIndex = 0;
+    for (int readIndex = 0; readIndex < context->variableToVirtualMapCount; readIndex++)
+    {
+        VariableToVirtualMapping mapping = context->variableToVirtualMap[readIndex];
+        if (strcmp(mapping.variableName, variableName) == 0)
+        {
+            continue; // drop: cached register no longer matches the slot
+        }
+        context->variableToVirtualMap[writeIndex] = mapping;
+        writeIndex++;
+    }
+    context->variableToVirtualMapCount = writeIndex;
+}
+
+// Drop every map entry that points at a given virtual. Call this whenever a
+// visitor repurposes an operand's register to hold a computed result (binary
+// op, logical negation): the virtual is still active, but its register no
+// longer holds the variable's value, so reuse would emit the wrong value.
+static void invalidateVariableMappingByVirtual(X64Context *context, int virtualId)
+{
+    if (virtualId < 0)
+    {
+        return;
+    }
+    int writeIndex = 0;
+    for (int readIndex = 0; readIndex < context->variableToVirtualMapCount; readIndex++)
+    {
+        VariableToVirtualMapping mapping = context->variableToVirtualMap[readIndex];
+        if (mapping.virtualId == virtualId)
+        {
+            continue;
+        }
+        context->variableToVirtualMap[writeIndex] = mapping;
+        writeIndex++;
+    }
+    context->variableToVirtualMapCount = writeIndex;
+}
+
+// A register only reliably caches a variable's value within one straight-line
+// basic block. At every control-flow boundary (loop head, branch target,
+// join) and across every `call` (which clobbers caller-saved registers), the
+// cache is no longer trustworthy, so drop all mappings and let the next
+// reference reload. An empty map is exactly the original always-reload
+// behavior — clearing can only cost the optimization, never correctness.
+static void invalidateAllVariableMappings(X64Context *context)
+{
+    context->variableToVirtualMapCount = 0;
+}
+
+// After a top-level statement finishes emitting, walk the map and kill the
+// virtual for any named variable that is no longer live-out at this point.
+// The killed virtual no longer contributes interference edges to future
+// regAllocNew() calls, which is the entire payoff of liveness analysis.
+static void killDeadVariableVirtuals(X64Context *context)
+{
+    int writeIndex = 0;
+    for (int readIndex = 0; readIndex < context->variableToVirtualMapCount; readIndex++)
+    {
+        VariableToVirtualMapping mapping = context->variableToVirtualMap[readIndex];
+        if (!livenessIsVarLiveOut(context->liveness, context->currentProgramPoint, mapping.variableName))
+        {
+            regAllocKill(&context->registerAllocator, mapping.virtualId);
+            continue;
+        }
+        context->variableToVirtualMap[writeIndex] = mapping;
+        writeIndex++;
+    }
+    context->variableToVirtualMapCount = writeIndex;
+}
+
 __attribute__((unused)) static int findVariableStackOffset(SymbolTable *symbolTable, const char *variableName, int functionIndex)
 {
     for (int entryIndex = 0; entryIndex < symbolTable->count; entryIndex++)
@@ -59,6 +162,8 @@ __attribute__((unused)) static int findVariableStackOffset(SymbolTable *symbolTa
     }
     return 0;
 }
+
+*/
 
 __attribute__((unused)) static int findObjectStackOffset(SymbolTable *symbolTable, const char *objectName, int functionIndex)
 {
@@ -103,11 +208,18 @@ static void visitBinaryOperation(Visitor *visitor, AstNode *node, const char *x6
     // that would shift the "latest" pointer — once we call regAllocNew
     // later in this function we'd lose track of them.
     int rightOperandVirtual = regAllocLastVirtualId(&context->registerAllocator);
+    int leftOperandVirtual = regAllocSecondLastVirtualId(&context->registerAllocator);
 
     fprintf(context->outputFile, "    %s %s, %s\n", x64Opcode, regAllocSecondLast(&context->registerAllocator), regAllocLast(&context->registerAllocator));
     fprintf(context->outputFile, "    mov [rbp-%d], %s\n", context->stackSlotIndex * 4 + 4, regAllocSecondLast(&context->registerAllocator));
     fprintf(context->outputFile, "    mov edi, %s\n\n", regAllocSecondLast(&context->registerAllocator));
     fprintf(context->outputFile, "    mov %s, %s \n\n", regAllocLast(&context->registerAllocator), regAllocSecondLast(&context->registerAllocator));
+
+
+    // The left operand's register now holds the binop *result*, not the
+    // variable it may have been caching — invalidate any map entry for it so
+    // a later reference reloads instead of reusing this clobbered register.
+    invalidateVariableMappingByVirtual(context, leftOperandVirtual);
 
     // Liveness demonstration: the right-operand virtual is dead now —
     // its value was folded into the result that lives in the left
